@@ -1,0 +1,17 @@
+beautifulsoup4==4.12.1
+Brotli==1.0.9
+certifi==2022.12.7
+charset-normalizer==3.1.0
+idna==3.4
+inflate64==0.3.1
+multivolumefile==0.2.3
+psutil==5.9.4
+py7zr==0.20.4
+pybcj==1.0.1
+pycryptodomex==3.17
+pyppmd==1.0.0
+pyzstd==0.15.6
+requests==2.28.2
+soupsieve==2.4
+texttable==1.6.7
+urllib3==1.26.15

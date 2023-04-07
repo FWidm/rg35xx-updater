@@ -124,39 +124,83 @@ def apply_boot_logo_override(conf):
     shutil.copy(conf.boot_logo_path, conf.boot_partition / "boot_logo.bmp.gz")
 
 
-
 def get_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("conf_overrides_path")
-    parser.add_argument("skin_conf_override_path")
-    parser.add_argument("skin_systems_override_path")
-    parser.add_argument("boot_logo_path")
+    parser = argparse.ArgumentParser(prog='RG35xx Onion Updater',
+                                     description='Fetches the newest onion os update, applies it and optionally allows overriding some content automatically',
+                                     epilog='Please support Garlic development at https://www.patreon.com/posts/76561333')
+    parser.add_argument('-bp', '--boot_partition', help="hardcode boot partition (uimage file)", required=False)
+    parser.add_argument('-rp', '--rarch_partition', help="hardcode retroarch partition (CFW folder)", required=False)
+    parser.add_argument('-co', '--conf_override', help="conf_overrides_path", required=False)
+    parser.add_argument('-so', '--skin_override_path', help="specify the file containing skin overrides here. "
+                                                            "This should be a json only containing options to override",
+                        required=False)
+    parser.add_argument('-si', '--skin_icons_dir', help="path to a folder containing system icons to override",
+                        required=False)
+    parser.add_argument('-bl', '--boot_logo', help="Replace custom bootlogo with the specified file", required=False)
+
     args = parser.parse_args()
-    return args.conf_overrides_path, args.skin_conf_override_path, args.skin_systems_override_path, args.boot_logo_path
+    return Config(Path(args.conf_override),
+                  Path(args.skin_override_path),
+                  Path(args.skin_icons_dir),
+                  Path(args.boot_partition),
+                  Path(args.rarch_partition),
+                  Path(args.boot_logo))
+
+
+def query_partition_letter(message: str, detected_path: Path) -> Path:
+    manual_rarch_partition_letter = input(message)
+    if manual_rarch_partition_letter:
+        rarch_manual_partition_path = Path(f"{manual_rarch_partition_letter}:")
+        if rarch_manual_partition_path.exists():
+            return rarch_manual_partition_path
+        else:
+            raise Exception(f"Unable to find partition for the given letter {manual_rarch_partition_letter}")
+    return detected_path
 
 
 def main():
-    conf_overrides_path, skin_conf_override_path, skin_systems_override_path, boot_logo_path = get_args()
+    config = get_args()
 
     available_drives = [Path(f"{d}:") for d in string.ascii_uppercase if os.path.exists('%s:' % d)]
+
     boot_partition = find_boot_partition(available_drives)
+    boot_partition = query_partition_letter(
+        f"Boot partition: {boot_partition} - press enter to continue, else enter the partition letter manually:\n",
+        boot_partition)
+
     rarch_partition = find_retroarch_drive(available_drives)
+    rarch_partition = query_partition_letter(
+        f"Retroarch partition: {rarch_partition} - press enter to continue, else enter the partition letter manually:\n",
+        rarch_partition)
 
-    conf = Config(Path(conf_overrides_path), skin_conf_override_path, skin_systems_override_path,
-                  boot_partition, rarch_partition, boot_logo_path)
+    if not boot_partition or not rarch_partition:
+        raise Exception(f"Unable to continue, partitions not specified. Please check boot and retroarch partitions:"
+                        f"\n - boot: {boot_partition}\n - rarch: {rarch_partition}")
 
-    print(f"boot: {conf.boot_partition}")
-    print(f"retroarch: {conf.rarch_partition}")
-    print(f"garlic retroarch conf path: {conf.conf_override_path}")
-    print(f"garlic skin path: {conf.skin_conf_override_path}")
+    config.boot_partition = Path(boot_partition)
+    config.rarch_partition = Path(rarch_partition)
+
+    print(f"boot: {config.boot_partition}")
+    print(f"retroarch: {config.rarch_partition}")
+    print(f"garlic retroarch conf path: {config.conf_override_path}")
+    print(f"garlic skin path: {config.skin_conf_override_path}")
 
     garlic_fp = fetch_garlic()
-    apply_garlic(conf, garlic_fp)
-    apply_config_overrides(conf)
-    apply_skin_overrides(conf)
-    apply_skin_system_overrides(conf)
-    apply_boot_logo_override(conf)
+    apply_garlic(config, garlic_fp)
+
+    print("Applying overrides...")
+    if config.conf_override_path:
+        apply_config_overrides(config)
+    if config.skin_conf_override_path:
+        apply_skin_overrides(config)
+    if config.skin_systems_override_path:
+        apply_skin_system_overrides(config)
+    if config.boot_logo_path:
+        apply_boot_logo_override(config)
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(e)

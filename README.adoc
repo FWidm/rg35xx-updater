@@ -1,0 +1,65 @@
+= RG35xx Garlic Updater
+
+This small script allows you to automatically fetch the newest GarlicOS version.GarlicOS is made by Black-Seraph, please support the project if you can at https://www.patreon.com/posts/76561333[their Patreon page].
+
+== Usage
+
+* install dependencies specified in `requirements.txt`
+* run `src/updater.py -h` and get familiar with the options
+* the script will by default just download the latest garlic, then it will apply the changes. Please backup your sd card before trying the tool.
+* if you provide any override options it willoverride the configuration/folders/files in either boot or retroarch partition
+
+== Todo
+- more flexible replacement options
+- allow replacing skins (this might be a bit iffy if garlic requires skin updates)
+- docker container / windows tool
+
+== CLI params
+
+- `-bp`: specify the boot partition, if not set the tool will attempt to detect it and ask you if it the partition is correct. Press enter if yes else specify the Label (no `:` needed)
+- `-rp`: specify the retroarch partition (see above for more info)
+- `-co`: retroarch config override. Expects you to copy paste the settings you want to automatically override in the same format as the normal config. The following example enables rewind and maps the button for you to menu + b:
++
+[source,]
+.retroarch.override.conf
+----
+input_rewind_btn="1"
+rewind_enable = "true"
+----
+- `-so`: skin config override. Expects a json file that only contains the keys and values you want to override. Example for moving the text to the right half of the screen:
++
+[source,json]
+.skin.overrides.json
+----
+{
+  "text-alignment": "left",
+  "text-margin": 352
+}
+----
+- `-si`: override the skins system folder with another one. This folde must contain the system pngs with the expected names.
+- `-bl`: override the boot logo with the specified boot logo
+
+== Examples
+My setup:
+
+[source]
+----
+rg35xx-updater
+    └── overrides
+        ├── system
+        ├── boot_logo.bmp.gz
+        ├── retroarch.override.conf
+        └── skin.overrides.json
+----
+
+Content of the conf overrides can be seen above.Then run the tool:
+
+[source,bash]
+----
+python3 src/updater.py -co ../overrides/retroarch.override.conf -so ../overrides/skin.overrides.json -si ../overrides/system -bl ../overrides/boot_logo.bmp.gz
+----
+
+This will upate garlic to the newest version, then enable rewind support if you press `b` and will aadd my new system images to the default skin.
+In addition it will alter the location of text in the skin to be on the right side.
+
+
