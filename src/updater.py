@@ -162,16 +162,20 @@ def main():
     config = get_args()
 
     available_drives = [Path(f"{d}:") for d in string.ascii_uppercase if os.path.exists('%s:' % d)]
+    boot_partition = None
+    rarch_partition = None
 
-    boot_partition = find_boot_partition(available_drives)
-    boot_partition = query_partition_letter(
-        f"Boot partition: {boot_partition} - press enter to continue, else enter the partition letter manually:\n",
-        boot_partition)
+    if not config.boot_partition or not config.boot_partition.exists():
+        boot_partition = find_boot_partition(available_drives)
+        boot_partition = query_partition_letter(
+            f"Boot partition: {boot_partition} - press enter to continue, else enter the partition letter manually:\n",
+            boot_partition)
 
-    rarch_partition = find_retroarch_drive(available_drives)
-    rarch_partition = query_partition_letter(
-        f"Retroarch partition: {rarch_partition} - press enter to continue, else enter the partition letter manually:\n",
-        rarch_partition)
+    if not config.rarch_partition or not config.rarch_partition.exists():
+        rarch_partition = find_retroarch_drive(available_drives)
+        rarch_partition = query_partition_letter(
+            f"Retroarch partition: {rarch_partition} - press enter to continue, else enter the partition letter manually:\n",
+            rarch_partition)
 
     if not boot_partition or not rarch_partition:
         raise Exception(f"Unable to continue, partitions not specified. Please check boot and retroarch partitions:"
@@ -180,13 +184,16 @@ def main():
     config.boot_partition = Path(boot_partition)
     config.rarch_partition = Path(rarch_partition)
 
+    print("=========================================================")
     print(f"boot: {config.boot_partition}")
     print(f"retroarch: {config.rarch_partition}")
     print(f"garlic retroarch conf path: {config.conf_override_path}")
     print(f"garlic skin path: {config.skin_conf_override_path}")
+    print("=========================================================")
 
     garlic_fp = fetch_garlic()
     apply_garlic(config, garlic_fp)
+
 
     print("Applying overrides...")
     if config.conf_override_path:

@@ -13,6 +13,9 @@ This small script allows you to automatically fetch the newest GarlicOS version.
 - more flexible replacement options
 - allow replacing skins (this might be a bit iffy if garlic requires skin updates)
 - docker container / windows tool
+- configurable output folder
+- add date to `out/garlic` folder
+- cleanup output folder
 
 == CLI params
 
