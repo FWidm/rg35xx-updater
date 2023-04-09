@@ -15,6 +15,11 @@ from src.skin_config import SkinConfig
 
 
 def find_boot_partition(partitions):
+    """
+    fetch the boot partition (must contain the uImage file)
+    :param partitions: all partition list
+    :return: boot partition if found
+    """
     for p in partitions:
         found = next((f for f in p.iterdir() if f.is_file() and f.name == 'uImage'), None)
         if found:
@@ -22,13 +27,25 @@ def find_boot_partition(partitions):
 
 
 def find_retroarch_drive(partitions):
+    """
+    fetch the rarch partition (must contain the uImage file)
+    :param partitions: all partition list
+    :return: rarch partition if found
+    """
     for p in partitions:
         found = next((f for f in p.iterdir() if f.is_dir() and f.name == 'CFW'), None)
         if found:
             return p
 
 
-def fetch_garlic(url: str = "https://www.patreon.com/posts/76561333", link_names=None):
+def fetch_garlic(output_path:Path, url: str = "https://www.patreon.com/posts/76561333", link_names=None):
+    """
+    Fetch garlic from the patreon posts, unzip it and return the fp
+    :param output_path: path to store tmp files in
+    :param url: of the garlic os post
+    :param link_names: names of the links, default to existing links in the patreon post
+    :return: fp to unzipped garlic
+    """
     if link_names is None:
         link_names = ["RG35XX-CopyPasteOnTopOfStock.7z.001", "RG35XX-CopyPasteOnTopOfStock.7z.002"]
 
@@ -45,21 +62,22 @@ def fetch_garlic(url: str = "https://www.patreon.com/posts/76561333", link_names
     soup = BeautifulSoup(response.content, "html.parser")
     links = soup.find_all("a", string=link_names)
 
-    garlic_fp = Path.cwd().parent / "out/garlic"
+    garlic_fp = output_path / "garlic"
     garlic_fp.mkdir(exist_ok=True, parents=True)
 
     # Loop through the links and download each file
     files = []
     links.sort(key=lambda l: l.string)
     for i, link in enumerate(links):
+        print(f"Downloading {link.text}...")
         url = link.get("href")
 
-        filename = f"../out/RG35XX-CopyPasteOnTopOfStock.7z.{i + 1:03d}"
-        files.append(Path(filename))
+        filename = output_path / f"/RG35XX-CopyPasteOnTopOfStock.7z.{i + 1:03d}"
+        files.append(filename)
         response = requests.get(url)
         with open(filename, "wb") as f:
             f.write(response.content)
-            print(f"downloaded... {filename} successfully!")
+            print(f"downloaded... {filename.name} successfully!")
 
     if len(files) <= 0:
         raise Exception("Unable to extract, no files were found")
@@ -142,8 +160,8 @@ def get_args():
     return Config(Path(args.conf_override),
                   Path(args.skin_override_path),
                   Path(args.skin_icons_dir),
-                  Path(args.boot_partition),
-                  Path(args.rarch_partition),
+                  Path(args.boot_partition) if args.boot_partition else None,
+                  Path(args.rarch_partition) if args.rarch_partition else None,
                   Path(args.boot_logo))
 
 
@@ -158,42 +176,40 @@ def query_partition_letter(message: str, detected_path: Path) -> Path:
     return detected_path
 
 
+def cleanup(path: Path):
+    if path.exists() and path.is_dir():
+        shutil.rmtree(path)
+
+
 def main():
     config = get_args()
 
     available_drives = [Path(f"{d}:") for d in string.ascii_uppercase if os.path.exists('%s:' % d)]
-    boot_partition = None
-    rarch_partition = None
 
     if not config.boot_partition or not config.boot_partition.exists():
         boot_partition = find_boot_partition(available_drives)
         boot_partition = query_partition_letter(
             f"Boot partition: {boot_partition} - press enter to continue, else enter the partition letter manually:\n",
             boot_partition)
+        config.boot_partition = Path(boot_partition)
 
     if not config.rarch_partition or not config.rarch_partition.exists():
         rarch_partition = find_retroarch_drive(available_drives)
         rarch_partition = query_partition_letter(
             f"Retroarch partition: {rarch_partition} - press enter to continue, else enter the partition letter manually:\n",
             rarch_partition)
+        config.rarch_partition = Path(rarch_partition)
 
-    if not boot_partition or not rarch_partition:
+    if not config.boot_partition or not config.rarch_partition:
         raise Exception(f"Unable to continue, partitions not specified. Please check boot and retroarch partitions:"
                         f"\n - boot: {boot_partition}\n - rarch: {rarch_partition}")
 
-    config.boot_partition = Path(boot_partition)
-    config.rarch_partition = Path(rarch_partition)
-
     print("=========================================================")
-    print(f"boot: {config.boot_partition}")
-    print(f"retroarch: {config.rarch_partition}")
-    print(f"garlic retroarch conf path: {config.conf_override_path}")
-    print(f"garlic skin path: {config.skin_conf_override_path}")
+    print(config)
     print("=========================================================")
 
-    garlic_fp = fetch_garlic()
+    garlic_fp = fetch_garlic(config.output_path)
     apply_garlic(config, garlic_fp)
-
 
     print("Applying overrides...")
     if config.conf_override_path:
@@ -205,9 +221,12 @@ def main():
     if config.boot_logo_path:
         apply_boot_logo_override(config)
 
+    cleanup_choice = input(f"Clean up downloaded files in {config.output_path} [y]es/[n]o?")
+    if cleanup_choice.lower() == 'y':
+        cleanup(config.output_path)
+        print("Finished cleanup")
+    print("Updates and overrides complete, enjoy! For a changelog visit https://www.patreon.com/posts/76561333")
+
 
 if __name__ == '__main__':
-    try:
-        main()
-    except Exception as e:
-        print(e)
+    main()
